@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XOX — Tic-Tac-Toe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Tokens ─────────────────────────────────────── */
+    :root {
+      --bg:        #0d0d0f;
+      --surface:   #16161a;
+      --border:    #2a2a32;
+      --x-color:   #e8445a;
+      --o-color:   #3ecfcf;
+      --text:      #f0f0f4;
+      --muted:     #6b6b80;
+      --win-glow:  #ffd166;
+      --radius:    16px;
+      --cell:      clamp(90px, 22vw, 130px);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid atmosphere ─────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    header {
+      text-align: center;
+    }
+
+    .logo {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(2.4rem, 10vw, 3.6rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .logo .x { color: var(--x-color); }
+    .logo .o { color: var(--o-color); }
+    .logo .slash { color: var(--muted); font-weight: 400; }
+
+    .tagline {
+      font-size: 0.8rem;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+
+    /* ── Score strip ─────────────────────────────────── */
+    .scores {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .score-card {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: border-color 0.25s;
+    }
+
+    .score-card.active-x  { border-color: var(--x-color); }
+    .score-card.active-o  { border-color: var(--o-color); }
+
+    .score-card .label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .score-card .player-mark {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .score-card.x-card .player-mark { color: var(--x-color); }
+    .score-card.o-card .player-mark { color: var(--o-color); }
+
+    .score-card .points {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .score-card.draw-card {
+      flex: 0 0 80px;
+    }
+
+    /* ── Status banner ───────────────────────────────── */
+    .status {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.95rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      min-height: 1.4em;
+      text-align: center;
+      transition: color 0.2s;
+    }
+
+    .status.win-x  { color: var(--x-color); }
+    .status.win-o  { color: var(--o-color); }
+    .status.draw   { color: var(--win-glow); }
+
+    /* ── Game board ──────────────────────────────────── */
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, var(--cell));
+      grid-template-rows:    repeat(3, var(--cell));
+      gap: 10px;
+    }
+
+    .cell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: calc(var(--cell) * 0.42);
+      font-weight: 700;
+      line-height: 1;
+      color: transparent;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      user-select: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cell:hover:not(.taken) {
+      background: #1e1e24;
+      border-color: #3a3a48;
+      transform: scale(1.03);
+    }
+
+    .cell.taken { cursor: default; }
+
+    .cell.x {
+      color: var(--x-color);
+      border-color: color-mix(in srgb, var(--x-color) 30%, var(--border));
+    }
+
+    .cell.o {
+      color: var(--o-color);
+      border-color: color-mix(in srgb, var(--o-color) 30%, var(--border));
+    }
+
+    .cell.winning {
+      background: color-mix(in srgb, var(--win-glow) 8%, var(--surface));
+      border-color: var(--win-glow);
+      animation: pulse 0.6s ease infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { box-shadow: 0 0 0 0 transparent; }
+      to   { box-shadow: 0 0 18px 2px color-mix(in srgb, var(--win-glow) 40%, transparent); }
+    }
+
+    /* pop-in animation */
+    @keyframes pop {
+      0%   { transform: scale(0.5); opacity: 0; }
+      70%  { transform: scale(1.1); }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+
+    .cell.x, .cell.o {
+      animation: pop 0.22s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+
+    /* ── Controls ────────────────────────────────────── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    button {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 20px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    button:active { transform: scale(0.97); }
+
+    .btn-new {
+      flex: 1;
+      background: var(--x-color);
+      border-color: var(--x-color);
+      color: #fff;
+    }
+
+    .btn-new:hover { background: #f05570; border-color: #f05570; }
+
+    .btn-reset {
+      flex: 1;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .btn-reset:hover { border-color: var(--muted); color: var(--text); }
+
+    /* ── Mode toggle ─────────────────────────────────── */
+    .mode-toggle {
+      display: flex;
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      width: 100%;
+    }
+
+    .mode-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 9px 14px;
+      font-size: 0.8rem;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .mode-btn.active {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    /* ── Footer ─────────────────────────────────────── */
+    footer {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Responsive ─────────────────────────────────── */
+    @media (max-width: 380px) {
+      :root { --cell: 90px; }
+      .score-card.draw-card { flex: 0 0 64px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cell { animation: none !important; }
+      .cell.winning { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="logo">
+      <span class="x">X</span><span class="slash">/</span><span class="o">O</span><span class="slash">/</span><span class="x">X</span>
+    </div>
+    <div class="tagline">Two players · One board · No mercy</div>
+  </header>
+
+  <!-- Mode selector -->
+  <div class="mode-toggle" role="group" aria-label="Game mode">
+    <button class="mode-btn active" id="btn2p"  onclick="setMode('2p')">👥 Two Players</button>
+    <button class="mode-btn"        id="btnCpu" onclick="setMode('cpu')">🤖 vs CPU</button>
+  </div>
+
+  <!-- Scores -->
+  <div class="scores">
+    <div class="score-card x-card active-x" id="scoreX">
+      <span class="label">Player</span>
+      <span class="player-mark">X</span>
+      <span class="points" id="ptsX">0</span>
+    </div>
+    <div class="score-card draw-card" id="scoreDraw">
+      <span class="label">Draw</span>
+      <span class="points" id="ptsDraw">0</span>
+    </div>
+    <div class="score-card o-card" id="scoreO">
+      <span class="label" id="oLabel">Player</span>
+      <span class="player-mark">O</span>
+      <span class="points" id="ptsO">0</span>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status" id="status">X's turn</div>
+
+  <!-- Board -->
+  <div class="board" id="board" role="grid" aria-label="Tic-Tac-Toe board">
+    <!-- cells injected by JS -->
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn-new"   onclick="newRound()">New Round</button>
+    <button class="btn-reset" onclick="resetAll()">Reset Scores</button>
+  </div>
+
+  <footer>Made with ♥ — drop it anywhere, it just works</footer>
+
+</div>
+
+<script>
+  /* ── State ───────────────────────────────────────── */
+  let board    = Array(9).fill(null);
+  let current  = 'X';
+  let gameOver = false;
+  let mode     = '2p';   // '2p' | 'cpu'
+  let scores   = { X: 0, O: 0, D: 0 };
+
+  const WINS = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  /* ── DOM refs ────────────────────────────────────── */
+  const boardEl   = document.getElementById('board');
+  const statusEl  = document.getElementById('status');
+  const ptsX      = document.getElementById('ptsX');
+  const ptsO      = document.getElementById('ptsO');
+  const ptsDraw   = document.getElementById('ptsDraw');
+  const scoreXEl  = document.getElementById('scoreX');
+  const scoreOEl  = document.getElementById('scoreO');
+  const oLabel    = document.getElementById('oLabel');
+
+  /* ── Init ────────────────────────────────────────── */
+  function buildBoard() {
+    boardEl.innerHTML = '';
+    board.forEach((_, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.setAttribute('role', 'gridcell');
+      cell.setAttribute('aria-label', `Cell ${i + 1}`);
+      cell.dataset.i = i;
+      cell.onclick = () => handleClick(i);
+      boardEl.appendChild(cell);
+    });
+  }
+
+  function renderBoard() {
+    const cells = boardEl.querySelectorAll('.cell');
+    cells.forEach((cell, i) => {
+      const val = board[i];
+      cell.textContent = val || '';
+      cell.className   = 'cell' + (val ? ` ${val.toLowerCase()} taken` : '');
+    });
+  }
+
+  /* ── Game logic ──────────────────────────────────── */
+  function handleClick(i) {
+    if (gameOver || board[i]) return;
+    place(i, current);
+    const result = checkResult();
+    if (!result && mode === 'cpu' && current === 'O') {
+      setTimeout(cpuMove, 350);
+    }
+  }
+
+  function place(i, mark) {
+    board[i] = mark;
+    const cell = boardEl.querySelector(`[data-i="${i}"]`);
+    cell.textContent = mark;
+    cell.className   = `cell ${mark.toLowerCase()} taken`;
+    current = mark === 'X' ? 'O' : 'X';
+    updateActiveCard();
+  }
+
+  function checkResult() {
+    for (const combo of WINS) {
+      const [a, b, c] = combo;
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+        endGame(board[a], combo);
+        return true;
+      }
+    }
+    if (board.every(Boolean)) {
+      endGame(null);
+      return true;
+    }
+    statusEl.textContent = `${current}'s turn`;
+    statusEl.className   = 'status';
+    return false;
+  }
+
+  function endGame(winner, combo) {
+    gameOver = true;
+    if (winner) {
+      scores[winner]++;
+      updateScoreDisplay();
+      highlightWin(combo);
+      statusEl.textContent = `${winner} wins! 🎉`;
+      statusEl.className   = `status win-${winner.toLowerCase()}`;
+    } else {
+      scores.D++;
+      updateScoreDisplay();
+      statusEl.textContent = "It's a draw!";
+      statusEl.className   = 'status draw';
+    }
+  }
+
+  function highlightWin(combo) {
+    combo.forEach(i => {
+      boardEl.querySelector(`[data-i="${i}"]`).classList.add('winning');
+    });
+  }
+
+  /* ── CPU (minimax) ───────────────────────────────── */
+  function cpuMove() {
+    if (gameOver) return;
+    const best = minimax(board, 'O', 0);
+    place(best.index, 'O');
+    checkResult();
+  }
+
+  function minimax(b, player, depth) {
+    const opp  = player === 'O' ? 'X' : 'O';
+    const win  = getWinner(b);
+    if (win === 'O') return { score:  10 - depth };
+    if (win === 'X') return { score: -10 + depth };
+    if (b.every(Boolean)) return { score: 0 };
+
+    const moves = [];
+    b.forEach((v, i) => {
+      if (!v) {
+        const nb = [...b]; nb[i] = player;
+        const result = minimax(nb, opp, depth + 1);
+        moves.push({ index: i, score: result.score });
+      }
+    });
+    const best = player === 'O'
+      ? moves.reduce((a, m) => m.score > a.score ? m : a)
+      : moves.reduce((a, m) => m.score < a.score ? m : a);
+    return best;
+  }
+
+  function getWinner(b) {
+    for (const [a, bb, c] of WINS)
+      if (b[a] && b[a] === b[bb] && b[a] === b[c]) return b[a];
+    return null;
+  }
+
+  /* ── UI helpers ──────────────────────────────────── */
+  function updateActiveCard() {
+    scoreXEl.classList.toggle('active-x', current === 'X');
+    scoreOEl.classList.toggle('active-o', current === 'O');
+  }
+
+  function updateScoreDisplay() {
+    ptsX.textContent    = scores.X;
+    ptsO.textContent    = scores.O;
+    ptsDraw.textContent = scores.D;
+  }
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById('btn2p').classList.toggle('active',  m === '2p');
+    document.getElementById('btnCpu').classList.toggle('active', m === 'cpu');
+    oLabel.textContent = m === 'cpu' ? 'CPU' : 'Player';
+    resetAll();
+  }
+
+  function newRound() {
+    board    = Array(9).fill(null);
+    current  = 'X';
+    gameOver = false;
+    buildBoard();
+    statusEl.textContent = "X's turn";
+    statusEl.className   = 'status';
+    scoreXEl.classList.add('active-x');
+    scoreOEl.classList.remove('active-o');
+  }
+
+  function resetAll() {
+    scores = { X: 0, O: 0, D: 0 };
+    updateScoreDisplay();
+    newRound();
+  }
+
+  /* ── Boot ────────────────────────────────────────── */
+  buildBoard();
+</script>
+</body>
+</html>
